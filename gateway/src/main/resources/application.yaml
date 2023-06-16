@@ -1,0 +1,29 @@
+server:
+  port: 10010
+spring:
+  application:
+    name: gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848  # Nacos 地址
+    gateway:
+      routes:
+        - id: user-service
+          uri: lb://userservice
+          predicates:
+            - Path=/user/**
+
+        - id: main-socket
+          uri: lb://mainsocket
+          predicates:
+            - Path=/socket/*
+
+
+        - id: gobang-socket
+          uri: lb://gobangsocket
+          predicates:
+            - Path=/gobang/**
+
+
+

@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>togo</groupId>
+    <artifactId>game-cloud</artifactId>
+    <packaging>pom</packaging>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
+        <java.version>17</java.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+    </properties>
+
+    <!--引入其他的服务 -->
+    <modules>
+        <module>user-server</module> <!-- 公共模块-->
+        <module>commons-pojo</module>
+        <module>gateway</module>
+        <module>main-socket</module>
+        <module>gobang-socket</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+
+            <!-- springcloud的管理依赖-->
+            <dependency>
+                <groupId>com.alibaba.cloud</groupId>
+                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                <version>2022.0.0.0-RC2</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- springboot的管理依赖-->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>3.0.7</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- 自定义公共模块 - 实体类 -->
+            <dependency>
+                <groupId>togo</groupId>
+                <artifactId>game-commons</artifactId>
+                <version>1.0-SNAPSHOT</version>
+            </dependency>
+
+        </dependencies>
+
+    </dependencyManagement>
+    <dependencies>
+
+        <!-- lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.28</version>
+            <scope>provided</scope>
+        </dependency>
+
+
+    </dependencies>
+
+</project>

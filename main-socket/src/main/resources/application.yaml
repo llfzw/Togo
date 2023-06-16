@@ -1,0 +1,9 @@
+server:
+  port: 8083
+spring:
+  application:
+    name: mainsocket
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848  # nacos服务器地址

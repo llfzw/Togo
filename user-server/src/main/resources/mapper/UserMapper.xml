@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="togo.dao.UserDao">
+
+    <select id="selectUserByEmail" resultType="toogoo.entity.User">
+        select `id`,`name`,`password`,`email`,`gold`, `head`, `region`
+        from `user`
+        where `email`=#{email}
+    </select>
+
+    <select id="selectUserById" resultType="toogoo.entity.User">
+        select `id`,`name`,`password`,`email`,`gold`, `head`, `region`
+        from `user`
+        where `id`=#{id}
+    </select>
+
+    <insert id="insertUser" parameterType="togo.pojo.RegisterDto">
+        insert into `user` (`name`,`password`,`email`)
+        values (#{user.name}, #{user.password}, #{user.email})
+    </insert>
+
+</mapper>
