@@ -25,8 +25,12 @@ public class GameManage {
         Game game = new Game(p1, p2, config);
         String gid = game.getRoomId();
         this.gameMap.put(gid, game);
-        this.gameIng.put(p1, gid);
-        this.gameIng.put(p2, gid);
+        if (!p1.equals(-1L))
+            this.gameIng.put(p1, gid);
+        if (!p2.equals(-1L)){
+            this.gameIng.put(p2, gid);
+            log.info("{}加入对局", p2);
+        }
         return game;
     }
 

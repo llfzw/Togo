@@ -64,7 +64,14 @@ public class MainSocket {
              * 匹配
              */
             case StartMatching -> {
-                mainService.match(uid, msg.getData());
+                mainService.match(uid, msg.getData(), "online");
+            }
+
+            /**
+             * 匹配人机
+             */
+            case MatchAi -> {
+                mainService.match(uid, msg.getData(), "ai");
             }
 
 

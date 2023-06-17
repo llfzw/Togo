@@ -16,6 +16,12 @@ public class Step {
 
     private Long time;
 
+    public Step(Integer x, Integer y, Long uid) {
+        this.x = x;
+        this.y = y;
+        this.uid = uid;
+    }
+
     public boolean isEmpty(){
         return x == null || y == null || uid == null;
     }

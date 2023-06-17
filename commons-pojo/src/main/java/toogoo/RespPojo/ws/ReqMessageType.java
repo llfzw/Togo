@@ -15,6 +15,7 @@ public enum ReqMessageType {
      * 开始匹配
      */
     StartMatching("开始匹配"),
+    MatchAi("匹配人机"),
     UnMatch("取消匹配"),
     CreatRoom("创建房间"),
     Drop("落子"),

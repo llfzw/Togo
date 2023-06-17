@@ -8,9 +8,11 @@ import gobang.manage.GobangManage;
 import gobang.manage.MatchQueuesManage;
 import gobang.pojo.Game;
 import gobang.pojo.GobangAssets;
+import gobang.pojo.game.GameConfigPojo;
 import gobang.pojo.game.Step;
 import gobang.pojo.vo.RivalInfoVo;
 import gobang.service.GoBangService;
+import gobang.utils.GobangAi;
 import gobang.ws.GoBangSocket;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
@@ -21,9 +23,11 @@ import toogoo.RespPojo.ws.RespMessage;
 import toogoo.RespPojo.ws.RespMessageType;
 import toogoo.Utils.JwtTokenUtil;
 import toogoo.entity.UserDto;
+import toogoo.game.MatchGame;
 
 import java.util.concurrent.CompletableFuture;
 
+import static gobang.pojo.game.GameConfigPojo.GAME_CONFIG;
 import static toogoo.RespPojo.ws.RespMessageType.*;
 
 @Slf4j
@@ -37,9 +41,11 @@ public class GoBangServiceImpl implements GoBangService {
     private final GameManage gameManage;
     private final GobangManage gobangManage;
     private final UserClient userClient;
+    private final GobangAi gobangAi;
 
     @Override
     public void drop(Long uid, Object data) {
+
         Step step = BeanUtil.toBean(data, Step.class);
         if (step == null) {
             log.error("收到落子信息格式转化错误 ： " + data);
@@ -58,14 +64,36 @@ public class GoBangServiceImpl implements GoBangService {
             return;
         }
         gobangManage.sendMessage(game, new RespMessage(RespMessageType.Drop, step));
+
+        if (game.getPlayer1().equals(-1L) || game.getPlayer2().equals(-1L)){
+            CompletableFuture.runAsync(()->{
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                Step aiStep = gobangAi.getStep(game.getCheckBoard().getCheckBoard());
+                if (game.fallStep(aiStep)) {
+                    log.info("AI落子成功");
+                    gobangManage.sendMessage(game, new RespMessage(RespMessageType.Drop, aiStep));
+                }else {
+                    log.info("AI落子失败，请排查");
+                }
+            });
+        }
+
+
+
     }
 
     @Override
-    public Long joinMatch(Long uid, String type, String mode) {
+    public Long joinMatch(MatchGame match) {
+        log.info("收到匹配消息");
+        System.out.println(match);
+        if (match == null || match.getUid() == null) return null;
 
-        if (uid == null) return null;
-
-        switch (mode) {
+        Long uid = match.getUid();
+        switch (match.getGameMode()) {
             /**
              * 在线模式
              */
@@ -82,9 +110,14 @@ public class GoBangServiceImpl implements GoBangService {
                 return matchQueuesManage.joinMatch(uid, rank);
             }
 
-            case "" -> {
-                log.info("未完成的模式");
-                return null;
+            case "ai" -> {
+                GameConfigPojo config =  BeanUtil.toBean(match.getConfig(), GameConfigPojo.class);
+                config.setCheckBoardLength(GAME_CONFIG.getCheckBoardLength());
+                Game game = gameManage.createGame(-1L, uid, config);
+                if (!game.fallStep(new Step(7, 7, -1L))) {
+                    log.info("人机第一颗落子失败");
+                }
+                return -1L;
             }
 
             default -> {
@@ -160,6 +193,10 @@ public class GoBangServiceImpl implements GoBangService {
         Game game = gameManage.getGame(uid);
         if (game == null) return Message.fail("不在游戏中");
         Long rivalId = game.getPlayer1().equals(uid) ? game.getPlayer2() : game.getPlayer1();
+        if (rivalId.equals(-1L)){
+
+            return Message.ok(new RivalInfoVo(rivalId, "AI人机", 1, "a.png", "地区"));
+        }
 
         RivalInfoVo rivalInfoVo = null;
 

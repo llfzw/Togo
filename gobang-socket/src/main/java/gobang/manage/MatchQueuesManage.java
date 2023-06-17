@@ -46,7 +46,7 @@ public class MatchQueuesManage {
         }
 
         if (gameManage.getGame(id) != null){
-            return -1L;
+            return null;
         }
 
         for (Long rival : matchQueueMap.keySet()){

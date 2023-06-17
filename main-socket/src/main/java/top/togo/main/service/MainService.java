@@ -7,7 +7,8 @@ public interface MainService {
     /**
      * 匹配
      */
-    void match(Long uid, Object msg);
+    void match(Long uid, Object msg, String type);
+
 
     /**
      * 取消匹配

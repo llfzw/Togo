@@ -12,9 +12,12 @@ import lombok.extern.slf4j.Slf4j;
 import toogoo.game.GameRoom;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
+
+import static gobang.pojo.game.GameConfigPojo.GAME_CONFIG;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
@@ -162,9 +165,9 @@ public class Game extends GameRoom {
                     } else {
                         backChessTime = 0;
                         this.stepTime--;
-                        log.info("stepTime: " + this.stepTime);
+//                        log.info("stepTime: " + this.stepTime);
                     }
-                    log.info("totalTime: " + this.totalTime);
+//                    log.info("totalTime: " + this.totalTime);
                     this.totalTime++;
                 }
                 try {
@@ -176,8 +179,6 @@ public class Game extends GameRoom {
         });
         this.timer.start();
     }
-
-
 
     /**
      * 认输
@@ -232,8 +233,6 @@ public class Game extends GameRoom {
             }
         }
         if (tag >= 5) return true;
-
-
 //        纵向
         tag = 0;
         for (int i = y; i >= 0; i--) {
@@ -291,6 +290,5 @@ public class Game extends GameRoom {
         return tag >= 5;
 
     }
-
 
 }

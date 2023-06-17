@@ -4,6 +4,7 @@ import gobang.pojo.Game;
 import gobang.pojo.game.Step;
 import gobang.ws.GoBangSocket;
 import toogoo.RespPojo.Message;
+import toogoo.game.MatchGame;
 
 public interface GoBangService {
 
@@ -17,11 +18,9 @@ public interface GoBangService {
     /**
      * 加入匹配队列
      *
-     * @param uid  uid
-     * @param type 类型
      * @return
      */
-    Long joinMatch(Long uid, String type, String mode);
+    Long joinMatch(MatchGame matchGame);
 
     /**
      * 删除匹配
