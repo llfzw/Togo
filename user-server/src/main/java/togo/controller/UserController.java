@@ -45,4 +45,11 @@ public class UserController {
     }
 
 
+    @ResponseBody
+    @RequestMapping("/visitorLogin")
+    public Message visitorLogin(String name, HttpServletResponse response){
+        return userService.visitorLogin(name, response);
+    }
+
+
 }

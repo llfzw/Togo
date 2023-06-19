@@ -15,8 +15,10 @@ public enum RespMessageType {
     GameData("游戏数据"),
     Drop("落子"),
     GameOver("游戏结束"),
-    Error("错误")
-    ;
+    Error("错误"),
+    BackChess("发起悔棋"),
+    agreeBackChess("同意悔棋"),
+    refuseBackChess("拒绝悔棋");
     private final String value;
 
     public String getValue(){

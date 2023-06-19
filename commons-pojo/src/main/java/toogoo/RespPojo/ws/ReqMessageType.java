@@ -18,8 +18,13 @@ public enum ReqMessageType {
     MatchAi("匹配人机"),
     UnMatch("取消匹配"),
     CreatRoom("创建房间"),
+    /**
+     * 下降
+     */
     Drop("落子"),
-    Start("有人发起开启游戏");
+    Start("有人发起开启游戏"),
+    Surrender("投降"),
+    BackChess("悔棋");
     private final String value;
     public String getValue(){
         return value;

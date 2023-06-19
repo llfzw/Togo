@@ -4,9 +4,10 @@ import gobang.pojo.Game;
 import gobang.pojo.game.Step;
 import gobang.ws.GoBangSocket;
 import toogoo.RespPojo.Message;
+import toogoo.RespPojo.ws.RespMessage;
 import toogoo.game.MatchGame;
 
-public interface GoBangService {
+public interface GoBangService{
 
     /**
      * 落子
@@ -51,12 +52,11 @@ public interface GoBangService {
      */
     void gameOver(String roomId);
 
+
     /**
      * 结算
-     *
-     * @param game 游戏
      */
-    void settlement(Game game);
+    void settlement(Long winId, Long failId);
 
     /**
      * 保存游戏
@@ -78,4 +78,34 @@ public interface GoBangService {
     Message gameInfoByToken(String token);
 
     void startGame(Long uid);
+
+    /**
+     * 投降
+     *
+     * @param uid uid
+     */
+    void surrender(Long uid);
+
+    /**
+     * 悔棋
+     *
+     * @param uid  uid
+     * @param data 数据
+     */
+    void backChess(Long uid, Object data);
+
+    /**
+     * 发送消息 (为了在游戏线程中通知前端，特意写的一个方法)
+     *
+     * @param game        游戏
+     * @param respMessage 分别地消息
+     */
+    void sendMessage(Game game, RespMessage respMessage);
+
+    /**
+     * 游戏排行
+     *
+     * @return {@link Message}
+     */
+    Message gameTop();
 }

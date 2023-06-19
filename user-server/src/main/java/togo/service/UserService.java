@@ -22,4 +22,5 @@ public interface UserService {
 
     UserDto findById(Long id);
 
+    Message visitorLogin(String name, HttpServletResponse response);
 }

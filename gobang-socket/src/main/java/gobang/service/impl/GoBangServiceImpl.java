@@ -1,6 +1,7 @@
 package gobang.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import gobang.clients.UserClient;
 import gobang.dao.GobangAssetsDao;
 import gobang.manage.GameManage;
@@ -11,17 +12,20 @@ import gobang.pojo.GobangAssets;
 import gobang.pojo.game.GameConfigPojo;
 import gobang.pojo.game.Step;
 import gobang.pojo.vo.RivalInfoVo;
+import gobang.pojo.vo.WinnerVo;
 import gobang.service.GoBangService;
 import gobang.utils.GobangAi;
 import gobang.ws.GoBangSocket;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import toogoo.RespPojo.Message;
 import toogoo.RespPojo.ws.RespMessage;
 import toogoo.RespPojo.ws.RespMessageType;
 import toogoo.Utils.JwtTokenUtil;
+import toogoo.entity.Assets;
 import toogoo.entity.UserDto;
 import toogoo.game.MatchGame;
 
@@ -35,8 +39,8 @@ import static toogoo.RespPojo.ws.RespMessageType.*;
 @RequiredArgsConstructor
 public class GoBangServiceImpl implements GoBangService {
 
-    private final JwtTokenUtil jwtTokenUtil;
     private final GobangAssetsDao gobangAssetsDao;
+    private final JwtTokenUtil jwtTokenUtil;
     private final MatchQueuesManage matchQueuesManage;
     private final GameManage gameManage;
     private final GobangManage gobangManage;
@@ -98,7 +102,7 @@ public class GoBangServiceImpl implements GoBangService {
              * 在线模式
              */
             case "online" -> {
-                GobangAssets gobangAssets = gobangAssetsDao.findByUid(uid);
+                GobangAssets gobangAssets = findByUid(uid);
                 Integer rank = 0;
                 if (gobangAssets == null){
 //            如果是第一次进入 没有创建表
@@ -111,6 +115,9 @@ public class GoBangServiceImpl implements GoBangService {
             }
 
             case "ai" -> {
+                if (gameManage.getGame(uid) != null){
+                    return -1L;
+                }
                 GameConfigPojo config =  BeanUtil.toBean(match.getConfig(), GameConfigPojo.class);
                 config.setCheckBoardLength(GAME_CONFIG.getCheckBoardLength());
                 Game game = gameManage.createGame(-1L, uid, config);
@@ -159,17 +166,27 @@ public class GoBangServiceImpl implements GoBangService {
     @Override
     public void gameOver(String roomId) {
         Game game = gameManage.getGame(roomId);
-        // 发送游戏结束消息
-        gobangManage.sendMessage(game, new RespMessage(GameOver, game));
+        Long player1 = game.getPlayer1();
+        Long player2 = game.getPlayer2();
+        Long winId = game.getWinInfo().getWinId();
+        Long failId = player1.equals(winId)? player2 : player1;
+
+        gobangManage.sendMessage(winId, new RespMessage(GameOver, new WinnerVo(winId, 100, 30)));
+        gobangManage.sendMessage(failId, new RespMessage(GameOver, new WinnerVo(winId, 50, -30)));
+
         //  保存对局  和  结算积分 并行执行
-        CompletableFuture.runAsync(()->saveGame(game)).thenRunAsync(()->settlement(game));
+        CompletableFuture.runAsync(()->saveGame(game));
+        CompletableFuture.runAsync(()->settlement(winId, failId));
+//        settlement(winId, failId);
         gameManage.gameOver(roomId);
     }
 
     @Override
-    public void settlement(Game game) {
-        // TODO 结算积分
-        CompletableFuture.supplyAsync(()-> gobangAssetsDao.findByUid(game.getPlayer1()));
+    public void settlement(Long winId, Long failId) {
+        //  结算积分  记得考虑人机和游客的情况
+        updateRankAndExp(winId, 30, 100);
+        updateRankAndExp(failId, -30, 50);
+
     }
 
     @Override
@@ -182,7 +199,7 @@ public class GoBangServiceImpl implements GoBangService {
     public Message getAssets(String token) {
         Long uid = getUidByToken(token);
         if (uid == null) return Message.fail("token is not");
-        GobangAssets assets = gobangAssetsDao.findByUid(uid);
+        GobangAssets assets = findByUid(uid);
         if (assets == null) return Message.fail(400, "error !");
         return Message.ok(assets);
     }
@@ -194,15 +211,13 @@ public class GoBangServiceImpl implements GoBangService {
         if (game == null) return Message.fail("不在游戏中");
         Long rivalId = game.getPlayer1().equals(uid) ? game.getPlayer2() : game.getPlayer1();
         if (rivalId.equals(-1L)){
-
             return Message.ok(new RivalInfoVo(rivalId, "AI人机", 1, "a.png", "地区"));
         }
-
         RivalInfoVo rivalInfoVo = null;
 
         try {
 
-            GobangAssets assets = gobangAssetsDao.findByUid(rivalId);
+            GobangAssets assets = findByUid(rivalId);
             UserDto userDto = userClient.findById(rivalId);
             rivalInfoVo = new RivalInfoVo(rivalId, userDto.getName(), assets.getGrade(), userDto.getHead(), userDto.getRegion());
 
@@ -225,8 +240,109 @@ public class GoBangServiceImpl implements GoBangService {
 
     @Override
     public void startGame(Long uid) {
-        gameManage.getGame(uid).start();
+        Game game = gameManage.getGame(uid);
+        if (game != null) {
+            game.start();
+        }
     }
 
+    @Override
+    public void surrender(Long uid) {
+        Game game = gameManage.getGame(uid);
+        if (game == null) return;
+
+        game.surrender(uid);
+    }
+
+    @Override
+    public void backChess(Long uid, Object data) {
+        Game game = gameManage.getGame(uid);
+        if (game == null) return;
+        switch (String.valueOf(data)){
+            case "back" -> {
+                if (!game.getState() || game.getNextPlayerId().equals(uid)) {
+                    gobangManage.sendMessage(uid, new RespMessage(Error, "当前不可以悔棋"));
+                    return;
+                }
+                game.setBackChess(true);
+//                发送消息 data中是发起悔棋方的uid
+                gobangManage.sendMessage(game, new RespMessage(BackChess, uid));
+
+            }
+            case "agree" -> {
+                if (!game.getState() || !game.getNextPlayerId().equals(uid)){
+                    gobangManage.sendMessage(uid, new RespMessage(Error, "无效的悔棋"));
+                    return;
+                }
+                if (game.backChess(uid)){
+                    gobangManage.sendMessage(game, new RespMessage(agreeBackChess, uid));
+                    return;
+                }
+            }
+            case "refuse" -> {
+                game.setBackChess(false);
+                gobangManage.sendMessage(game, new RespMessage(refuseBackChess, uid));
+            }
+        }
+
+
+    }
+
+    @Override
+    public void sendMessage(Game game, RespMessage respMessage) {
+        gobangManage.sendMessage(game, respMessage);
+    }
+
+    @Override
+    public Message gameTop() {
+        return Message.ok(gobangAssetsDao.getTopByRank(20));
+    }
+
+
+    /**
+     * 根据id查询
+     *
+     * @param uid uid
+     * @return {@link GobangAssets}
+     */
+    private GobangAssets findByUid(Long uid){
+        if (uid == null) return null;
+        if (uid < 0){
+//            游客默认数据
+            return new GobangAssets(uid, 0, 1, 100);
+        }
+
+        return gobangAssetsDao.findByUid(uid);
+    }
+
+
+    /**
+     * 更新等级和经验值
+     *
+     * @param uid  uid
+     * @param rank 排名
+     * @param exp  经验值
+     */
+    private void updateRankAndExp(Long uid, int  rank, int exp){
+        GobangAssets assets = findByUid(uid);
+        if (assets != null && uid > 0){
+            LambdaUpdateWrapper<Assets> lambdaUpdateWrapper = new LambdaUpdateWrapper<>();
+            lambdaUpdateWrapper.eq(Assets::getUid, uid);
+
+            Assets gobangAssets = new Assets();
+            gobangAssets.setRank(assets.getRank() + rank);
+
+            if (assets.getExp() + exp < assets.getGrade() * 100){
+                gobangAssets.setExp(assets.getExp() + exp);
+            }else {
+                gobangAssets.setExp(assets.getGrade() * 100 - (assets.getExp() + exp) );
+                gobangAssets.setGrade(assets.getGrade() + 1);
+            }
+            gobangAssetsDao.update(gobangAssets,lambdaUpdateWrapper);
+            return;
+        }
+        log.info("人机和游客不加减分数");
+
+    }
 
 }

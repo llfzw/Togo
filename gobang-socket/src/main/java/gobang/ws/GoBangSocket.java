@@ -51,13 +51,23 @@ public class GoBangSocket {
         if (msg == null) return;
 
         switch (msg.getType()){
+//            开始游戏
+            case Start -> {
+                goBangService.startGame(uid);
+            }
+
+//            落子
             case Drop -> {
-                log.info("drop");
                 goBangService.drop(uid, msg.getData());
             }
 
-            case Start -> {
-                goBangService.startGame(uid);
+//            投降
+            case Surrender -> {
+                goBangService.surrender(uid);
+            }
+//            悔棋
+            case BackChess -> {
+                goBangService.backChess(uid, msg.getData());
             }
 
 

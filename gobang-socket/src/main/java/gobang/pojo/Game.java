@@ -9,6 +9,7 @@ import gobang.ws.GoBangSocket;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
+import toogoo.RespPojo.ws.RespMessage;
 import toogoo.game.GameRoom;
 
 import java.util.ArrayList;
@@ -18,6 +19,7 @@ import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 
 import static gobang.pojo.game.GameConfigPojo.GAME_CONFIG;
+import static toogoo.RespPojo.ws.RespMessageType.refuseBackChess;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
@@ -31,8 +33,11 @@ public class Game extends GameRoom {
 
     private int stepTime;           //步骤时长
     private int totalTime = 0;      //总时长
+    private int remainder1;
+    private int remainder2;
 
-    private boolean state;
+
+    private Boolean state;
     private GameConfigPojo config;   // 游戏对局配置
     private transient Thread timer; // 计时线程
 
@@ -46,8 +51,12 @@ public class Game extends GameRoom {
         super.setPlayer1(player1);
         super.setPlayer2(player2);
         super.setRoomId(UUID.randomUUID().toString());
+
+        this.state = false;
         this.config = config;
-        this.stepTime = config.getStepTime() + 10;
+        this.stepTime = config.getStepTime() + 6;
+        this.remainder1 = config.getPlayerTime();
+        this.remainder2 = config.getPlayerTime();
 
         checkBoard = new CheckBoard(config.getCheckBoardLength());
 //       根据配置设置先手等信息
@@ -108,9 +117,10 @@ public class Game extends GameRoom {
         return true;
     }
 
-
     /**
-     * 悔棋
+     * 悔棋 （加入是你发起悔棋应该由对手来调用该方法）
+     *
+     * @param uid 同意悔棋的人
      * @return boolean
      */
     public boolean backChess(Long uid){
@@ -119,6 +129,7 @@ public class Game extends GameRoom {
         Step step = steps.get(index);
         checkBoard.set(step, 0);
         steps.remove(index);
+        this.backChess = false;
         return true;
     }
 
@@ -149,31 +160,49 @@ public class Game extends GameRoom {
             int backChessTime = 0;
             int backMaxWaitTime = config.getBackMaxWaitTime();
             while (this.state){
-                if (this.stepTime <= 0){
+                if (this.stepTime <= 0 || remainder1 == 0 || remainder2 == 0){
 //                    设置获胜信息
                     winInfo = new WinInfo(backPlayer(), "对手超时");
                     gameOver();
                     break;
                 }else {
-                    if (backChess || drawChess){
-                        backChessTime++;
-                        log.info("当前处于悔棋或和棋等待时间，计时线程不减少");
-                        if (backChessTime >= backMaxWaitTime){
-                            this.backChess = false;
-//                          TODO 超时未响应悔棋操作 ，自动拒绝  通知前端
+
+//                    悔棋线程
+                    {
+                        if (backChess || drawChess){
+                            backChessTime++;
+                            log.info("当前处于悔棋或和棋等待时间，计时线程不减少");
+                            if (backChessTime >= backMaxWaitTime){
+                                this.backChess = false;
+//                              超时未响应悔棋操作 ，自动拒绝  通知前端
+//                                GoBangSocket.goBangService.sendMessage
+                                GoBangSocket.goBangService.sendMessage(this, new RespMessage(refuseBackChess, getNextPlayerId()));
+                            }
+                        } else {
+                            backChessTime = 0;
+                            this.stepTime--;
                         }
-                    } else {
-                        backChessTime = 0;
-                        this.stepTime--;
-//                        log.info("stepTime: " + this.stepTime);
                     }
-//                    log.info("totalTime: " + this.totalTime);
+
+//                    总时间线程
                     this.totalTime++;
+
+//                    每个人总剩余时间
+                    {
+                        if (getNextPlayerId().equals(getPlayer1()))
+                            remainder1--;
+                        else
+                            remainder2--;
+                    }
+
+
                 }
+
                 try {
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    gameOver();
+                    throw new RuntimeException(e);
                 }
             }
         });
@@ -185,8 +214,8 @@ public class Game extends GameRoom {
      * @param uid uid
      */
     public void surrender(Long uid){
-        log.info(uid + " 已经认输 游戏结束");
         if (uid.equals(getPlayer1()) || uid.equals(getPlayer2())){
+            log.info(uid + " 已经认输 游戏结束");
             winInfo = new WinInfo(uid.equals(getPlayer1()) ? getPlayer2() : getPlayer1(), "对手投降");
             gameOver();
         }

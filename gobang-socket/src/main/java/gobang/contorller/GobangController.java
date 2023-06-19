@@ -9,27 +9,30 @@ import toogoo.RespPojo.Message;
 @RequestMapping("gobang")
 @CrossOrigin
 @Controller
+@ResponseBody
 public class GobangController {
 
     @Autowired
     private GoBangService goBangService;
 
-    @ResponseBody
     @RequestMapping("/assets")
     public Message myAssetsInfo(@CookieValue("token") String token){
         return goBangService.getAssets(token);
     }
 
-    @ResponseBody
     @RequestMapping("/rival")
     public Message assetsInfo(@CookieValue("token") String token){
         return goBangService.rivalInfoByToken(token);
     }
 
-    @ResponseBody
     @RequestMapping("/gameInfo")
     public Message gameInfo(@CookieValue("token") String token){
         return goBangService.gameInfoByToken(token);
+    }
+
+    @RequestMapping("/gameTop")
+    public Message gameTop(){
+        return goBangService.gameTop();
     }
 
 }

@@ -13,8 +13,12 @@
     <insert id="insertAssets">
         insert into `gobang` (`uid`)
         values (#{uid})
-
     </insert>
+
+    <select id="getTopByRank" resultType="gobang.pojo.vo.GameTopVo">
+        select * from `gobang`
+                 order by `rank` desc limit 0,#{num}
+    </select>
 
 
 </mapper>

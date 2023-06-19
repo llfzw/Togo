@@ -1,6 +1,7 @@
 package togo.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.json.JSONUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
@@ -26,8 +27,7 @@ import java.util.concurrent.TimeUnit;
 
 import static togo.utils.EmailUtil.emailIsMatch;
 import static togo.utils.EmailUtil.sendEmail;
-import static toogoo.config.PrefixConfig.REGISTER_CODE_PREFIX;
-import static toogoo.config.PrefixConfig.LOGIN_CODE_PREFIX;
+import static toogoo.config.PrefixConfig.*;
 
 @Service
 @Slf4j
@@ -42,7 +42,7 @@ public class UserServiceImpl implements UserService {
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
 
-    private final int loginMaxAge = 1000 * 60 * 60 * 5;
+    private final int loginMaxAge = 1000 * 60 * 60 * 24;
 
     /**
      * 密码登录功能
@@ -64,7 +64,7 @@ public class UserServiceImpl implements UserService {
             return Message.fail(400, "密码不正确");
         }
 
-        String token = createTokenByUser(user1);
+        String token = createTokenByUser(user1.getId());
 
         Cookie cookie = new Cookie("token", token);
         cookie.setMaxAge(loginMaxAge);  //5小时
@@ -127,7 +127,7 @@ public class UserServiceImpl implements UserService {
         }
 
 //        生成token
-        String token = createTokenByUser(user);
+        String token = createTokenByUser(user.getId());
 
         Cookie cookie = new Cookie("token", token);
         cookie.setMaxAge(loginMaxAge);  //5小时
@@ -138,15 +138,13 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * 根据User创建Token
-     * @param user
+     * 根据Id创建Token
+     * @param id
      * @return
      */
-    private String createTokenByUser(User user) {
+    private String createTokenByUser(Long id) {
         Map<String, Object> claims = new HashMap<>();
-        claims.put("id", user.getId());
-        claims.put("name", user.getName());
-
+        claims.put("id", id);
         return jwtTokenUtil.createToken(claims);
     }
 
@@ -210,19 +208,19 @@ public class UserServiceImpl implements UserService {
 
         if (map.isEmpty()){
             log.error("验证码不存在或已过期");
-            return Message.fail(400, "验证码不存在或已过期");
+            return Message.fail("验证码不存在或已过期");
         }
 
         if (!map.get("code").equals(submitCodeFrom.getCode())) {
             log.error("验证码错误");
-            return Message.fail(400, "验证码错误");
+            return Message.fail("验证码错误");
         }
 
         RegisterDto registerDto = BeanUtil.toBeanIgnoreCase(map, RegisterDto.class, true);
 
         int insertUser = userDao.insertUser(registerDto);
 
-        if (insertUser == 0) return Message.fail(400, "注册失败");
+        if (insertUser == 0) return Message.fail("注册失败");
 
         return Message.ok("注册成功！");
     }
@@ -231,21 +229,54 @@ public class UserServiceImpl implements UserService {
     public Message getUserInfoByToken(String token) {
         log.info("token 获取用户信息: \n --->" + token);
         Claims claims = jwtTokenUtil.getClaimsFormToken(token);
-        if (claims == null) return Message.fail(400, "Token not have token!");
+        if (claims == null) return Message.fail("Token not have token!");
         Long id = claims.get("id", Long.class);
-        User user = userDao.selectUserById(id);
-        UserDto userDto = BeanUtil.copyProperties(user, UserDto.class);
-        log.info(user.toString());
-        log.info(userDto.toString());
+        UserDto userDto =findById(id);
+        if (userDto == null) return Message.fail("Token not have token!");
         return Message.ok(userDto);
     }
 
     @Override
     public UserDto findById(Long id) {
+        if (id == null){
+            return null;
+        }
+        if (id < 0){
+//            TODO 获取游客信息
+            String userDtoStr = stringRedisTemplate.opsForValue().get(VISITOR_PREFIX + id);
+            log.info(userDtoStr);
+            if (userDtoStr == null) {
+                return null;
+            }
+            return JSONUtil.toBean(userDtoStr, UserDto.class);
+        }
+
         User user = userDao.selectUserById(id);
 
       return BeanUtil.copyProperties(user, UserDto.class);
 
+    }
+
+    @Override
+    public Message visitorLogin(String name, HttpServletResponse response) {
+
+        log.info("name: {}" , name);
+//        1、生成游客Id
+        Long vid = getVisitorNextId();
+        UserDto userDto = new UserDto(vid, name, 10, "a.png");
+
+        CompletableFuture.runAsync(()->{
+            //        保存到redis中并设置一天有效期
+            stringRedisTemplate.opsForValue().set(VISITOR_PREFIX + vid, JSONUtil.toJsonStr(userDto), 24, TimeUnit.HOURS);
+        });
+        String token = createTokenByUser(vid);
+
+        Cookie cookie = new Cookie("token", token);
+        cookie.setMaxAge(loginMaxAge);  //24小时
+        cookie.setPath("/");//设置作用域
+        response.addCookie(cookie);
+
+        return Message.ok(token);
     }
 
     /**
@@ -262,4 +293,20 @@ public class UserServiceImpl implements UserService {
         return code.toString();
 
     }
+
+
+    /**
+     * 得到游客下一个id
+     *
+     * @return {@link Long}
+     */
+    private Long getVisitorNextId(){
+        Long id = stringRedisTemplate.opsForValue().increment(VISITOR_ID_PREFIX, -1);
+        if (id != null && id.equals(-1L)){
+            return getVisitorNextId();
+        }
+        return id;
+
+    }
+
 }
