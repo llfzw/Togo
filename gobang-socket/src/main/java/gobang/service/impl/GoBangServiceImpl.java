@@ -11,6 +11,7 @@ import gobang.pojo.Game;
 import gobang.pojo.GobangAssets;
 import gobang.pojo.game.GameConfigPojo;
 import gobang.pojo.game.Step;
+import gobang.pojo.vo.GameTopVo;
 import gobang.pojo.vo.RivalInfoVo;
 import gobang.pojo.vo.WinnerVo;
 import gobang.service.GoBangService;
@@ -29,6 +30,7 @@ import toogoo.entity.Assets;
 import toogoo.entity.UserDto;
 import toogoo.game.MatchGame;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static gobang.pojo.game.GameConfigPojo.GAME_CONFIG;
@@ -276,7 +278,6 @@ public class GoBangServiceImpl implements GoBangService {
                 }
                 if (game.backChess(uid)){
                     gobangManage.sendMessage(game, new RespMessage(agreeBackChess, uid));
-                    return;
                 }
             }
             case "refuse" -> {
@@ -295,7 +296,11 @@ public class GoBangServiceImpl implements GoBangService {
 
     @Override
     public Message gameTop() {
-        return Message.ok(gobangAssetsDao.getTopByRank(20));
+        List<GameTopVo> top = gobangAssetsDao.getTopByRank(20);
+        for (GameTopVo vo : top) {
+            vo.setUserDto(userClient.findById(vo.getUid()));
+        }
+        return Message.ok(top);
     }
 
 

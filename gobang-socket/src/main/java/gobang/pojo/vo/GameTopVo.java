@@ -1,6 +1,7 @@
 package gobang.pojo.vo;
 
 import lombok.Data;
+import toogoo.entity.UserDto;
 
 @Data
 public class GameTopVo {
@@ -9,5 +10,7 @@ public class GameTopVo {
     private Integer rank;
 
     private Integer grade;
+
+    private UserDto userDto;
 
 }
